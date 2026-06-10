@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,9 +8,10 @@ import plotly.express as px
 import re
 import string
 from textblob import TextBlob
+from collections import Counter
 
 # =========================
-# PAGE CONFIG
+# CONFIG
 # =========================
 st.set_page_config(
     page_title="COVID-19 Sentiment Dashboard",
@@ -20,33 +20,26 @@ st.set_page_config(
 )
 
 # =========================
-# UI STYLE
+# STYLE
 # =========================
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: weight;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""
+<style>
+.stApp {
+    background-color: #fff8f0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("🦠 COVID-19 Sentiment Analysis Dashboard")
+st.write("Dashboard professionnel d’analyse des tweets")
 
 # =========================
-# TITLE
-# =========================
-st.title("🦠 Application d'Analyse des Sentiments - COVID-19")
-st.write("Dashboard professionnel pour analyse des tweets et sentiments")
-
-# =========================
-# LOAD + CLEAN DATA
+# LOAD DATA
 # =========================
 @st.cache_data
 def load_data():
     df = pd.read_csv("Corona_NLP_train.csv", encoding="latin-1")
 
-    # mapping sentiments
     mapping = {
         "Extremely Positive": "Positive",
         "Positive": "Positive",
@@ -56,7 +49,6 @@ def load_data():
     }
     df["Sentiment"] = df["Sentiment"].map(mapping)
 
-    # clean text
     def clean_text(text):
         text = str(text).lower()
         text = re.sub(r'https?://\S+|www\.\S+', '', text)
@@ -67,15 +59,13 @@ def load_data():
 
     df["Clean_Tweet"] = df["OriginalTweet"].apply(clean_text)
 
-    # sentiment via TextBlob
     def sentiment_ai(text):
         score = TextBlob(text).sentiment.polarity
         if score > 0:
             return "Positive"
         elif score < 0:
             return "Negative"
-        else:
-            return "Neutral"
+        return "Neutral"
 
     df["AI_Sentiment"] = df["Clean_Tweet"].apply(sentiment_ai)
 
@@ -83,19 +73,17 @@ def load_data():
 
 df = load_data()
 
-st.markdown("---")
-
 # =========================
-# SIDEBAR FILTERS
+# SIDEBAR
 # =========================
-st.sidebar.header("🔎 Filtres")
+st.sidebar.header("🔎 Filters")
 
 sentiment_filter = st.sidebar.selectbox(
-    "Filtrer par sentiment",
+    "Sentiment",
     ["All", "Positive", "Neutral", "Negative"]
 )
 
-search = st.sidebar.text_input("🔍 Rechercher un tweet")
+search = st.sidebar.text_input("Search tweet")
 
 df_filtered = df.copy()
 
@@ -103,20 +91,19 @@ if sentiment_filter != "All":
     df_filtered = df_filtered[df_filtered["AI_Sentiment"] == sentiment_filter]
 
 if search:
-    df_filtered = df_filtered[
-        df_filtered["Clean_Tweet"].str.contains(search.lower(), na=False)
-    ]
+    df_filtered = df_filtered[df_filtered["Clean_Tweet"].str.contains(search.lower(), na=False)]
 
 # =========================
 # KPI
 # =========================
-c1, c2, c3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 sent_counts = df_filtered["AI_Sentiment"].value_counts()
 
-c1.metric("📊 Tweets", df_filtered.shape[0])
-c2.metric("🧠 Positifs", sent_counts.get("Positive", 0))
-c3.metric("😡 Négatifs", sent_counts.get("Negative", 0))
+col1.metric("Tweets", len(df_filtered))
+col2.metric("Positive", sent_counts.get("Positive", 0))
+col3.metric("Negative", sent_counts.get("Negative", 0))
+col4.metric("Neutral", sent_counts.get("Neutral", 0))
 
 st.markdown("---")
 
@@ -124,81 +111,114 @@ st.markdown("---")
 # TABS
 # =========================
 tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Analyse",
+    "📊 Data",
     "☁️ WordCloud",
-    "📈 Graphiques",
-    "🔮 Test IA"
+    "📈 Analytics",
+    "🔮 Live Test"
 ])
 
 # =========================
-# TAB 1 - DATA
+# TAB 1
 # =========================
 with tab1:
-    st.subheader("Aperçu des données")
+    st.subheader("Dataset Preview")
     st.dataframe(df_filtered[["OriginalTweet", "Clean_Tweet", "AI_Sentiment"]].head(20))
 
 # =========================
-# TAB 2 - WORDCLOUD
+# TAB 2 WORDCLOUD
 # =========================
 with tab2:
-    st.subheader("Nuage de mots")
+    st.subheader("WordCloud")
 
     text = " ".join(df_filtered["Clean_Tweet"].astype(str))
 
-    wc = WordCloud(
-        width=1200,
-        height=500,
-        background_color="white",
-        colormap="viridis"
-    ).generate(text)
+    wc = WordCloud(width=1200, height=500, background_color="white").generate(text)
 
     fig, ax = plt.subplots()
     ax.imshow(wc, interpolation="bilinear")
     ax.axis("off")
     st.pyplot(fig)
 
+    # Top words
+    st.subheader("🔥 Top Words")
+
+    words = " ".join(df_filtered["Clean_Tweet"]).split()
+    common = Counter(words).most_common(15)
+
+    words_df = pd.DataFrame(common, columns=["Word", "Count"])
+
+    fig2 = px.bar(words_df, x="Word", y="Count", title="Top 15 words")
+    st.plotly_chart(fig2, use_container_width=True)
+
 # =========================
-# TAB 3 - GRAPHS
+# TAB 3 ANALYTICS
 # =========================
 with tab3:
-    st.subheader("Distribution des sentiments")
+    st.subheader("📊 Sentiment Distribution")
 
     fig1 = px.histogram(
         df_filtered,
         x="AI_Sentiment",
-        color="AI_Sentiment",
-        title="Sentiments Distribution"
+        color="AI_Sentiment"
     )
     st.plotly_chart(fig1, use_container_width=True)
 
     fig2 = px.pie(
         df_filtered,
-        names="AI_Sentiment",
-        title="Répartition des sentiments"
+        names="AI_Sentiment"
     )
     st.plotly_chart(fig2, use_container_width=True)
 
+    # Tweet length
+    df_filtered["length"] = df_filtered["Clean_Tweet"].apply(len)
+
+    st.subheader("📏 Tweet Length Analysis")
+
+    fig3 = px.box(
+        df_filtered,
+        x="AI_Sentiment",
+        y="length",
+        color="AI_Sentiment"
+    )
+    st.plotly_chart(fig3, use_container_width=True)
+
+    fig4 = px.histogram(
+        df_filtered,
+        x="length",
+        nbins=40
+    )
+    st.plotly_chart(fig4, use_container_width=True)
+
+    # Correlation
+    st.subheader("🔥 Correlation")
+
+    corr = df_filtered[["length"]].corr()
+
+    fig5, ax = plt.subplots()
+    sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
+    st.pyplot(fig5)
+
 # =========================
-# TAB 4 - LIVE TEST
+# TAB 4 LIVE TEST
 # =========================
 with tab4:
-    st.subheader("🔮 Test de sentiment en temps réel")
+    st.subheader("🔮 Test Sentiment IA")
 
-    user_text = st.text_area("Écris un tweet ici:")
+    text_input = st.text_area("Enter tweet:")
 
-    if st.button("Analyser"):
+    if st.button("Analyze"):
 
-        if user_text.strip() == "":
-            st.warning("Veuillez entrer un texte")
+        if text_input.strip() == "":
+            st.warning("Enter text")
         else:
-            score = TextBlob(user_text).sentiment.polarity
+            score = TextBlob(text_input).sentiment.polarity
 
             if score > 0:
-                st.success("😊 POSITIF")
+                st.success("Positive 😊")
             elif score < 0:
-                st.error("😡 NEGATIF")
+                st.error("Negative 😡")
             else:
-                st.info("😐 NEUTRE")
+                st.info("Neutral 😐")
 
             st.metric("Score", round(score, 2))
 
@@ -206,4 +226,4 @@ with tab4:
 # FOOTER
 # =========================
 st.markdown("---")
-st.markdown("🚀 Projet Data Science | COVID-19 Sentiment Analysis | Streamlit")
+st.markdown("🚀 Professional Data Science Project | COVID-19 Sentiment Analysis")
