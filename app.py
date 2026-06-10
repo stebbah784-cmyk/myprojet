@@ -25,6 +25,7 @@ st.subheader("Filière : Informatique Appliquée (S6)")
 st.markdown("🦠 ML for sentiment analysis: case of Covid 19")
 
 st.markdown("---")
+st.markdown("Réalisée par : Wakil chaimae et Stebba houda ")
 
 # =========================
 # STYLE
