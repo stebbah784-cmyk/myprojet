@@ -1,4 +1,15 @@
 import streamlit as st
+
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #E6F2FF; 
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,19 +18,19 @@ from wordcloud import WordCloud
 import re
 import string
 
-# 1. إعدادات الصفحة
+
 st.set_page_config(page_title="Covid-19 Sentiment Analysis", page_icon="🦠", layout="wide")
 
 st.title("🦠 Application d'Analyse des Sentiments - COVID-19 Tweets")
 st.write("Bienvenue dans votre projet professionnel de Data Science. Cette application analyse l'opinion publique sur Twitter durant la pandémie.")
 
-# 2. قراءة البيانات وتنظيفها (باش تخدم ديريكت فالرابط)
+
 @st.cache_data
 def load_and_clean_data():
-    # غانقراو الملف ديالك
+    
     df = pd.read_csv("Corona_NLP_train.csv", encoding='latin-1')
     
-    # تبسيط المشاعر لـ 3 أنواع
+   
     mapping = {
         "Extremely Positive": "Positive", "Positive": "Positive",
         "Neutral": "Neutral",
