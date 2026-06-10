@@ -22,8 +22,9 @@ st.set_page_config(
 # =========================
 st.title("🎓 Université Chouaib Doukkali - Faculté des Sciences El Jadida")
 st.subheader("Filière : Informatique Appliquée (S6)")
-st.subheader("Réalisée par : Wakil chaimae et Stebba houda ")
+
 st.markdown("🦠 ML for sentiment analysis: case of Covid 19")
+st.markdown("Réalisée par : Wakil chaimae et Stebba houda ")
 
 
 st.markdown("---")
