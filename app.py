@@ -44,33 +44,41 @@ model = pickle.load(open("model.pkl", "rb"))
 vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
 
 # =========================
-# CLEAN TEXT
+# CLEAN TEXT (MULTI-LANGUAGE FIX)
 # =========================
 def clean_text(text):
     text = str(text).lower()
+
     text = re.sub(r"http\S+", "", text)
     text = re.sub(r"@\w+", "", text)
     text = re.sub(r"#", "", text)
-    text = re.sub(r"[%s]" % re.escape(string.punctuation), "", text)
-    text = re.sub(r"[^a-zA-Z\s]", "", text)
+
+    # keep accents + multilingual letters
+    text = re.sub(r"[^\w\sÀ-ÿ]", "", text)
+
     return text
 
 # =========================
-# PREDICT
+# PREDICTION (ROBUST FIX)
 # =========================
 def predict_sentiment(text):
+
     cleaned = clean_text(text)
+
+    if cleaned.strip() == "":
+        return "Neutral"
+
     vector = vectorizer.transform([cleaned])
     prediction = model.predict(vector)[0]
-    return prediction
+
+    return str(prediction)
 
 # =========================
-# LOAD DATA (FIXED PATH)
+# LOAD DATA
 # =========================
 @st.cache_data
 def load_data():
 
-    # FIX: only existing file
     df = pd.read_csv("Corona_NLP_train.csv", encoding="latin-1")
 
     mapping = {
@@ -105,13 +113,13 @@ sentiment_filter = st.sidebar.selectbox(
 search = st.sidebar.text_input("🔍 Search Tweet")
 
 # =========================
-# FILTERS
+# FILTERING
 # =========================
 df_filtered = df.copy()
 
 if sentiment_filter != "All":
     df_filtered = df_filtered[
-        df_filtered["AI_Sentiment"] == sentiment_filter
+        df_filtered["AI_Sentiment"].str.lower().str.contains(sentiment_filter.lower())
     ]
 
 if search:
@@ -153,7 +161,7 @@ with tab1:
     )
 
 # =========================
-# TAB 2 (FIXED WORDCLOUD)
+# TAB 2 (WORDCLOUD FIXED)
 # =========================
 with tab2:
 
@@ -165,14 +173,16 @@ with tab2:
     )
 
     if option != "All":
-        data_words = df_filtered[df_filtered["AI_Sentiment"] == option]
+        data_words = df_filtered[
+            df_filtered["AI_Sentiment"].str.lower() == option.lower()
+        ]
     else:
         data_words = df_filtered
 
     text = " ".join(data_words["Clean_Tweet"].dropna().astype(str))
 
     if text.strip() == "" or len(text.split()) < 2:
-        st.warning("⚠️ No enough words to generate WordCloud.")
+        st.warning("⚠️ Not enough words to generate WordCloud.")
     else:
         wc = WordCloud(
             width=1200,
@@ -190,18 +200,18 @@ with tab2:
 
         words = text.split()
 
-        if len(words) > 0:
-            common = Counter(words).most_common(15)
-            words_df = pd.DataFrame(common, columns=["Word", "Count"])
+        common = Counter(words).most_common(15)
 
-            fig2 = px.bar(
-                words_df,
-                x="Word",
-                y="Count",
-                title="Most Frequent Words"
-            )
+        words_df = pd.DataFrame(common, columns=["Word", "Count"])
 
-            st.plotly_chart(fig2, use_container_width=True)
+        fig2 = px.bar(
+            words_df,
+            x="Word",
+            y="Count",
+            title="Most Frequent Words"
+        )
+
+        st.plotly_chart(fig2, use_container_width=True)
 
 # =========================
 # TAB 3
@@ -238,7 +248,7 @@ with tab3:
     st.plotly_chart(fig3, use_container_width=True)
 
 # =========================
-# TAB 4
+# TAB 4 (FIXED LIVE TEST)
 # =========================
 with tab4:
 
@@ -251,11 +261,14 @@ with tab4:
         if user_text.strip() == "":
             st.warning("Please enter text")
         else:
+
             prediction = predict_sentiment(user_text)
 
-            if prediction == "Positive":
+            pred = prediction.lower()
+
+            if "positive" in pred:
                 st.success("😊 POSITIVE")
-            elif prediction == "Negative":
+            elif "negative" in pred:
                 st.error("😡 NEGATIVE")
             else:
                 st.info("😐 NEUTRAL")
