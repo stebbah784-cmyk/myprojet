@@ -24,8 +24,8 @@ st.set_page_config(
 # HEADER
 # =========================
 st.title("🎓 Université Chouaib Doukkali - Faculté des Sciences El Jadida")
-st.subheader("📘 Filière : Intelligence Artificielle & Big Data (S6)")
-st.markdown("🦠 COVID-19 Sentiment Analysis Dashboard (Projet Data Science)")
+st.subheader("Filière : Informatique Appliquée (S6)")
+st.markdown("🦠ML for sentiment analysis: case of Covid 19 ")
 
 st.markdown("---")
 
