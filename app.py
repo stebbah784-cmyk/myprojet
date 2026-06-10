@@ -208,4 +208,4 @@ with tab4:
 # FOOTER
 # =========================
 st.markdown("---")
-st.markdown("🎓 UCD - FS El Jadida | IA S6 | Data Science Project | COVID-19 Sentiment Analysis")
+st.markdown("🎓 UCD - FS El Jadida | IA S6 | Data Science |  Sujet : ML for sentiment analysis: case of Covid 19")
