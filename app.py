@@ -32,6 +32,11 @@ st.markdown("""
 # =========================
 st.title("🦠 Application d'Analyse des Sentiments - COVID-19")
 st.write("Dashboard interactif avec Machine Learning")
+# hhhouda  
+import os
+
+st.write("Files found:")
+st.write(os.listdir())
 
 # =========================
 # LOAD MODEL
