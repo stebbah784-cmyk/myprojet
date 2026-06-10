@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -14,10 +15,19 @@ from collections import Counter
 # CONFIG
 # =========================
 st.set_page_config(
-    page_title="COVID-19 Sentiment Dashboard",
-    page_icon="🦠",
+    page_title="UCD - IA S6 Sentiment Dashboard",
+    page_icon="🎓",
     layout="wide"
 )
+
+# =========================
+# HEADER
+# =========================
+st.title("🎓 Université Chouaib Doukkali - Faculté des Sciences El Jadida")
+st.subheader("📘 Filière : Intelligence Artificielle & Big Data (S6)")
+st.markdown("🦠 COVID-19 Sentiment Analysis Dashboard (Projet Data Science)")
+
+st.markdown("---")
 
 # =========================
 # STYLE
@@ -25,13 +35,10 @@ st.set_page_config(
 st.markdown("""
 <style>
 .stApp {
-    background-color: #fff8f0;
+    background-color: #fff7ed;
 }
 </style>
 """, unsafe_allow_html=True)
-
-st.title("🦠 COVID-19 Sentiment Analysis Dashboard")
-st.write("Dashboard professionnel d’analyse des tweets")
 
 # =========================
 # LOAD DATA
@@ -47,6 +54,7 @@ def load_data():
         "Negative": "Negative",
         "Extremely Negative": "Negative"
     }
+
     df["Sentiment"] = df["Sentiment"].map(mapping)
 
     def clean_text(text):
@@ -83,7 +91,7 @@ sentiment_filter = st.sidebar.selectbox(
     ["All", "Positive", "Neutral", "Negative"]
 )
 
-search = st.sidebar.text_input("Search tweet")
+search = st.sidebar.text_input("Search Tweet")
 
 df_filtered = df.copy()
 
@@ -96,14 +104,13 @@ if search:
 # =========================
 # KPI
 # =========================
-col1, col2, col3, col4 = st.columns(4)
+c1, c2, c3 = st.columns(3)
 
 sent_counts = df_filtered["AI_Sentiment"].value_counts()
 
-col1.metric("Tweets", len(df_filtered))
-col2.metric("Positive", sent_counts.get("Positive", 0))
-col3.metric("Negative", sent_counts.get("Negative", 0))
-col4.metric("Neutral", sent_counts.get("Neutral", 0))
+c1.metric("Tweets", len(df_filtered))
+c2.metric("Positive", sent_counts.get("Positive", 0))
+c3.metric("Negative", sent_counts.get("Negative", 0))
 
 st.markdown("---")
 
@@ -112,8 +119,8 @@ st.markdown("---")
 # =========================
 tab1, tab2, tab3, tab4 = st.tabs([
     "📊 Data",
-    "☁️ WordCloud",
-    "📈 Analytics",
+    "☁️ Word Analysis",
+    "📈 Visualisation",
     "🔮 Live Test"
 ])
 
@@ -121,97 +128,72 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # TAB 1
 # =========================
 with tab1:
-    st.subheader("Dataset Preview")
+    st.subheader("📁 Dataset Preview")
     st.dataframe(df_filtered[["OriginalTweet", "Clean_Tweet", "AI_Sentiment"]].head(20))
 
 # =========================
-# TAB 2 WORDCLOUD
+# TAB 2 - WORDCLOUD
 # =========================
 with tab2:
-    st.subheader("WordCloud")
+    st.subheader("☁️ WordCloud Analysis")
 
-    text = " ".join(df_filtered["Clean_Tweet"].astype(str))
+    option = st.selectbox("Select sentiment:", ["All", "Positive", "Negative", "Neutral"])
 
-    wc = WordCloud(width=1200, height=500, background_color="white").generate(text)
+    if option != "All":
+        data_words = df_filtered[df_filtered["AI_Sentiment"] == option]
+    else:
+        data_words = df_filtered
+
+    text = " ".join(data_words["Clean_Tweet"].astype(str))
+
+    wc = WordCloud(width=1000, height=400, background_color="white").generate(text)
 
     fig, ax = plt.subplots()
     ax.imshow(wc, interpolation="bilinear")
     ax.axis("off")
     st.pyplot(fig)
 
-    # Top words
-    st.subheader("🔥 Top Words")
+    st.markdown("### 🔥 Top Words")
 
-    words = " ".join(df_filtered["Clean_Tweet"]).split()
+    words = text.split()
     common = Counter(words).most_common(15)
 
     words_df = pd.DataFrame(common, columns=["Word", "Count"])
 
-    fig2 = px.bar(words_df, x="Word", y="Count", title="Top 15 words")
+    fig2 = px.bar(words_df, x="Word", y="Count", title="Most Frequent Words")
     st.plotly_chart(fig2, use_container_width=True)
 
 # =========================
-# TAB 3 ANALYTICS
+# TAB 3
 # =========================
 with tab3:
-    st.subheader("📊 Sentiment Distribution")
+    st.subheader("📊 Sentiment Analytics")
 
-    fig1 = px.histogram(
-        df_filtered,
-        x="AI_Sentiment",
-        color="AI_Sentiment"
-    )
+    fig1 = px.pie(df_filtered, names="AI_Sentiment", title="Sentiment Distribution")
     st.plotly_chart(fig1, use_container_width=True)
 
-    fig2 = px.pie(
-        df_filtered,
-        names="AI_Sentiment"
-    )
+    fig2 = px.histogram(df_filtered, x="AI_Sentiment", color="AI_Sentiment")
     st.plotly_chart(fig2, use_container_width=True)
 
-    # Tweet length
     df_filtered["length"] = df_filtered["Clean_Tweet"].apply(len)
 
-    st.subheader("📏 Tweet Length Analysis")
-
-    fig3 = px.box(
-        df_filtered,
-        x="AI_Sentiment",
-        y="length",
-        color="AI_Sentiment"
-    )
+    fig3 = px.box(df_filtered, x="AI_Sentiment", y="length", color="AI_Sentiment")
     st.plotly_chart(fig3, use_container_width=True)
 
-    fig4 = px.histogram(
-        df_filtered,
-        x="length",
-        nbins=40
-    )
-    st.plotly_chart(fig4, use_container_width=True)
-
-    # Correlation
-    st.subheader("🔥 Correlation")
-
-    corr = df_filtered[["length"]].corr()
-
-    fig5, ax = plt.subplots()
-    sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
-    st.pyplot(fig5)
-
 # =========================
-# TAB 4 LIVE TEST
+# TAB 4
 # =========================
 with tab4:
-    st.subheader("🔮 Test Sentiment IA")
+    st.subheader("🔮 Live Sentiment Test (AI)")
 
-    text_input = st.text_area("Enter tweet:")
+    user_text = st.text_area("Enter text:")
 
     if st.button("Analyze"):
 
-        if text_input.strip() == "":
-            st.warning("Enter text")
+        if user_text.strip() == "":
+            st.warning("Please enter text")
         else:
-            score = TextBlob(text_input).sentiment.polarity
+            score = TextBlob(user_text).sentiment.polarity
 
             if score > 0:
                 st.success("Positive 😊")
@@ -226,4 +208,4 @@ with tab4:
 # FOOTER
 # =========================
 st.markdown("---")
-st.markdown("🚀 Professional Data Science Project | COVID-19 Sentiment Analysis")
+st.markdown("🎓 UCD - FS El Jadida | IA S6 | Data Science Project | COVID-19 Sentiment Analysis")
