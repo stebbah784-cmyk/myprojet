@@ -81,7 +81,7 @@ def predict_sentiment(text):
 @st.cache_data
 def load_data():
 
-    df = pd.read_csv("Corona_NLP_test.csv", encoding="latin-1")
+    df = pd.read_csv("Corona_NLP_train.csv", encoding="latin-1")
 
     mapping = {
         "Extremely Positive": "Positive",
