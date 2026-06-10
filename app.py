@@ -5,7 +5,6 @@ from wordcloud import WordCloud
 import plotly.express as px
 import pickle
 import re
-import string
 from collections import Counter
 
 # =========================
@@ -44,7 +43,7 @@ model = pickle.load(open("model.pkl", "rb"))
 vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
 
 # =========================
-# CLEAN TEXT (MULTI-LANGUAGE FIX)
+# CLEAN TEXT (MULTI-LANGUAGE SAFE)
 # =========================
 def clean_text(text):
     text = str(text).lower()
@@ -53,13 +52,13 @@ def clean_text(text):
     text = re.sub(r"@\w+", "", text)
     text = re.sub(r"#", "", text)
 
-    # keep accents + multilingual letters
+    # keep multilingual characters
     text = re.sub(r"[^\w\sÀ-ÿ]", "", text)
 
     return text
 
 # =========================
-# PREDICTION (ROBUST FIX)
+# PREDICT SENTIMENT (FIXED)
 # =========================
 def predict_sentiment(text):
 
@@ -161,7 +160,7 @@ with tab1:
     )
 
 # =========================
-# TAB 2 (WORDCLOUD FIXED)
+# TAB 2
 # =========================
 with tab2:
 
@@ -199,7 +198,6 @@ with tab2:
         st.markdown("### 🔥 Top Words")
 
         words = text.split()
-
         common = Counter(words).most_common(15)
 
         words_df = pd.DataFrame(common, columns=["Word", "Count"])
@@ -248,7 +246,7 @@ with tab3:
     st.plotly_chart(fig3, use_container_width=True)
 
 # =========================
-# TAB 4 (FIXED LIVE TEST)
+# TAB 4
 # =========================
 with tab4:
 
@@ -263,7 +261,6 @@ with tab4:
         else:
 
             prediction = predict_sentiment(user_text)
-
             pred = prediction.lower()
 
             if "positive" in pred:
