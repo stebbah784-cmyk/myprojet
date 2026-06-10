@@ -1,44 +1,61 @@
 import streamlit as st
-
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: #FF9800; 
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from wordcloud import WordCloud
+import plotly.express as px
 import re
 import string
+from textblob import TextBlob
 
+# =========================
+# PAGE CONFIG
+# =========================
+st.set_page_config(
+    page_title="COVID-19 Sentiment Dashboard",
+    page_icon="🦠",
+    layout="wide"
+)
 
-st.set_page_config(page_title="Covid-19 Sentiment Analysis", page_icon="🦠", layout="wide")
-
-st.title("🦠 Application d'Analyse des Sentiments - COVID-19 Tweets")
-st.write("Bienvenue dans votre projet professionnel de Data Science. Cette application analyse l'opinion publique sur Twitter durant la pandémie.")
-
-
-@st.cache_data
-def load_and_clean_data():
-    
-    df = pd.read_csv("Corona_NLP_train.csv", encoding='latin-1')
-    
-   
-    mapping = {
-        "Extremely Positive": "Positive", "Positive": "Positive",
-        "Neutral": "Neutral",
-        "Negative": "Negative", "Extremely Negative": "Negative"
+# =========================
+# UI STYLE
+# =========================
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #FF9800;
     }
-    df['Sentiment'] = df['Sentiment'].map(mapping)
-    
-    # دالة التنظيف
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# =========================
+# TITLE
+# =========================
+st.title("🦠 Application d'Analyse des Sentiments - COVID-19")
+st.write("Dashboard professionnel pour analyse des tweets et sentiments")
+
+# =========================
+# LOAD + CLEAN DATA
+# =========================
+@st.cache_data
+def load_data():
+    df = pd.read_csv("Corona_NLP_train.csv", encoding="latin-1")
+
+    # mapping sentiments
+    mapping = {
+        "Extremely Positive": "Positive",
+        "Positive": "Positive",
+        "Neutral": "Neutral",
+        "Negative": "Negative",
+        "Extremely Negative": "Negative"
+    }
+    df["Sentiment"] = df["Sentiment"].map(mapping)
+
+    # clean text
     def clean_text(text):
         text = str(text).lower()
         text = re.sub(r'https?://\S+|www\.\S+', '', text)
@@ -46,69 +63,146 @@ def load_and_clean_data():
         text = re.sub(r'#', '', text)
         text = re.sub(r'[%s]' % re.escape(string.punctuation), '', text)
         return text
-    
-    df['Clean_Tweet'] = df['OriginalTweet'].apply(clean_text)
+
+    df["Clean_Tweet"] = df["OriginalTweet"].apply(clean_text)
+
+    # sentiment via TextBlob
+    def sentiment_ai(text):
+        score = TextBlob(text).sentiment.polarity
+        if score > 0:
+            return "Positive"
+        elif score < 0:
+            return "Negative"
+        else:
+            return "Neutral"
+
+    df["AI_Sentiment"] = df["Clean_Tweet"].apply(sentiment_ai)
+
     return df
 
-# تحميل البيانات
-df = load_and_clean_data()
+df = load_data()
 
 st.markdown("---")
 
-# 3. الجزء الأول: الإحصائيات والرسوم البيانية (Visualisations)
-st.subheader("📊 1. Vue d'ensemble et Statistiques des Données")
+# =========================
+# SIDEBAR FILTERS
+# =========================
+st.sidebar.header("🔎 Filtres")
 
-# تقسيم الشاشة لـ 2 أعمدة
-col1, col2 = st.columns(2)
+sentiment_filter = st.sidebar.selectbox(
+    "Filtrer par sentiment",
+    ["All", "Positive", "Neutral", "Negative"]
+)
 
-with col1:
-    st.write("### Répartition des Sentiments")
-    # رسم بياني لتوزيع المشاعر
-    fig, ax = plt.subplots(figsize=(6, 4))
-    sns.countplot(data=df, x='Sentiment', order=['Positive', 'Neutral', 'Negative'], palette='viridis', ax=ax)
-    plt.title("Nombre de Tweets par Sentiment")
+search = st.sidebar.text_input("🔍 Rechercher un tweet")
+
+df_filtered = df.copy()
+
+if sentiment_filter != "All":
+    df_filtered = df_filtered[df_filtered["AI_Sentiment"] == sentiment_filter]
+
+if search:
+    df_filtered = df_filtered[
+        df_filtered["Clean_Tweet"].str.contains(search.lower(), na=False)
+    ]
+
+# =========================
+# KPI
+# =========================
+c1, c2, c3 = st.columns(3)
+
+sent_counts = df_filtered["AI_Sentiment"].value_counts()
+
+c1.metric("📊 Tweets", df_filtered.shape[0])
+c2.metric("🧠 Positifs", sent_counts.get("Positive", 0))
+c3.metric("😡 Négatifs", sent_counts.get("Negative", 0))
+
+st.markdown("---")
+
+# =========================
+# TABS
+# =========================
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 Analyse",
+    "☁️ WordCloud",
+    "📈 Graphiques",
+    "🔮 Test IA"
+])
+
+# =========================
+# TAB 1 - DATA
+# =========================
+with tab1:
+    st.subheader("Aperçu des données")
+    st.dataframe(df_filtered[["OriginalTweet", "Clean_Tweet", "AI_Sentiment"]].head(20))
+
+# =========================
+# TAB 2 - WORDCLOUD
+# =========================
+with tab2:
+    st.subheader("Nuage de mots")
+
+    text = " ".join(df_filtered["Clean_Tweet"].astype(str))
+
+    wc = WordCloud(
+        width=1200,
+        height=500,
+        background_color="white",
+        colormap="viridis"
+    ).generate(text)
+
+    fig, ax = plt.subplots()
+    ax.imshow(wc, interpolation="bilinear")
+    ax.axis("off")
     st.pyplot(fig)
 
-with col2:
-    st.write("### Échantillon des Données Nettoyées")
-    # عرض جدول فيه التغريدة قبل وبعد التنظيف مع شعورها
-    st.dataframe(df[['OriginalTweet', 'Clean_Tweet', 'Sentiment']].head(10))
+# =========================
+# TAB 3 - GRAPHS
+# =========================
+with tab3:
+    st.subheader("Distribution des sentiments")
 
-st.markdown("---")
+    fig1 = px.histogram(
+        df_filtered,
+        x="AI_Sentiment",
+        color="AI_Sentiment",
+        title="Sentiments Distribution"
+    )
+    st.plotly_chart(fig1, use_container_width=True)
 
-# 4. الجزء الثاني: سحابة الكلمات (WordCloud)
-st.subheader("☁️ 2. Nuage de Mots (WordCloud) par Sentiment")
-st.write("Choisissez un sentiment pour voir les mots les plus fréquents utilisés par les utilisateurs :")
+    fig2 = px.pie(
+        df_filtered,
+        names="AI_Sentiment",
+        title="Répartition des sentiments"
+    )
+    st.plotly_chart(fig2, use_container_width=True)
 
-selected_sentiment = st.selectbox("Sélectionnez un Sentiment :", ['Positive', 'Negative', 'Neutral'])
+# =========================
+# TAB 4 - LIVE TEST
+# =========================
+with tab4:
+    st.subheader("🔮 Test de sentiment en temps réel")
 
-# توليد سحابة الكلمات حسب الاختيار
-sentiment_data = df[df['Sentiment'] == selected_sentiment]
-all_words = ' '.join([text for text in sentiment_data['Clean_Tweet']])
+    user_text = st.text_area("Écris un tweet ici:")
 
-fig_wc, ax_wc = plt.subplots(figsize=(10, 5))
-wordcloud = WordCloud(width=800, height=400, background_color='white', max_words=100).generate(all_words)
-ax_wc.imshow(wordcloud, interpolation='bilinear')
-ax_wc.axis('off')
-st.pyplot(fig_wc)
+    if st.button("Analyser"):
 
-st.markdown("---")
-
-# 5. الجزء الثالث: المربع التفاعلي للتجريب (Test en Temps Réel)
-st.subheader("🔮 3. Test de Prédiction en Temps Réel")
-st.write("Saisissez un tweet (en Anglais) pour simuler l'analyse de sentiment :")
-
-user_input = st.text_area("Exemple: The vaccine development is a great news for everyone!", "")
-
-if st.button("Analyser le Sentiment"):
-    if user_input.strip() != "":
-        # هنا غانديرو محاكاة بسيطة، وفالمرحلة الجاية نربطوها بالموديل الحقيقي ديال Machine Learning
-        # هاد السطور غايبينو للبروف بلي السيستم خدام تفاعلي
-        if "good" in user_input.lower() or "great" in user_input.lower() or "hope" in user_input.lower() or "safe" in user_input.lower():
-            st.success("Résultat de la prédiction : **Positive** 😊")
-        elif "bad" in user_input.lower() or "crisis" in user_input.lower() or "lockdown" in user_input.lower() or "scared" in user_input.lower():
-            st.error("Résultat de la prédiction : **Negative** 😡")
+        if user_text.strip() == "":
+            st.warning("Veuillez entrer un texte")
         else:
-            st.warning("Résultat de la prédiction : **Neutral** 😐")
-    else:
-        st.info("Veuillez saisir un texte pour tester.")
+            score = TextBlob(user_text).sentiment.polarity
+
+            if score > 0:
+                st.success("😊 POSITIF")
+            elif score < 0:
+                st.error("😡 NEGATIF")
+            else:
+                st.info("😐 NEUTRE")
+
+            st.metric("Score", round(score, 2))
+
+# =========================
+# FOOTER
+# =========================
+st.markdown("---")
+st.markdown("🚀 Projet Data Science | COVID-19 Sentiment Analysis | Streamlit")
