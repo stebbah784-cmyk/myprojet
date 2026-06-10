@@ -3,18 +3,28 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 import plotly.express as px
-import seaborn as sns
 import pickle
 import re
+import string
+from collections import Counter
 
 # =========================
 # PAGE CONFIG
 # =========================
 st.set_page_config(
-    page_title="COVID-19 Sentiment Dashboard",
-    page_icon="🦠",
+    page_title="UCD - IA S6 Sentiment Dashboard",
+    page_icon="🎓",
     layout="wide"
 )
+
+# =========================
+# HEADER
+# =========================
+st.title("🎓 Université Chouaib Doukkali - Faculté des Sciences El Jadida")
+st.subheader("Filière : Informatique Appliquée (S6)")
+st.markdown("🦠 ML for sentiment analysis: case of Covid 19")
+
+st.markdown("---")
 
 # =========================
 # STYLE
@@ -22,17 +32,10 @@ st.set_page_config(
 st.markdown("""
 <style>
 .stApp {
-    background-color: #FF9800;
+    background-color: #fff7ed;
 }
 </style>
 """, unsafe_allow_html=True)
-
-# =========================
-# TITLE
-# =========================
-st.title("🦠 Application d'Analyse des Sentiments - COVID-19")
-st.write("Dashboard interactif avec Machine Learning")
-
 
 # =========================
 # LOAD MODEL
@@ -52,6 +55,8 @@ def clean_text(text):
     text = re.sub(r"@\w+", "", text)
 
     text = re.sub(r"#", "", text)
+
+    text = re.sub(r"[%s]" % re.escape(string.punctuation), "", text)
 
     text = re.sub(r"[^a-zA-Z\s]", "", text)
 
@@ -76,11 +81,24 @@ def predict_sentiment(text):
 @st.cache_data
 def load_data():
 
-    df = pd.read_csv("Corona_NLP_train.csv", encoding="latin-1")
+    df = pd.read_csv("Corona_NLP_test.csv", encoding="latin-1")
+
+    mapping = {
+        "Extremely Positive": "Positive",
+        "Positive": "Positive",
+        "Neutral": "Neutral",
+        "Negative": "Negative",
+        "Extremely Negative": "Negative"
+    }
+
+    if "Sentiment" in df.columns:
+        df["Sentiment"] = df["Sentiment"].map(mapping)
 
     df["Clean_Tweet"] = df["OriginalTweet"].apply(clean_text)
 
-    df["AI_Sentiment"] = df["Clean_Tweet"].apply(predict_sentiment)
+    df["AI_Sentiment"] = df["Clean_Tweet"].apply(
+        predict_sentiment
+    )
 
     return df
 
@@ -89,31 +107,36 @@ df = load_data()
 # =========================
 # SIDEBAR
 # =========================
-st.sidebar.header("🔎 Filtres")
+st.sidebar.header("🔎 Filters")
 
 sentiment_filter = st.sidebar.selectbox(
-    "Filtrer par sentiment",
+    "Sentiment",
     ["All", "Positive", "Neutral", "Negative"]
 )
 
-search = st.sidebar.text_input("🔍 Rechercher un tweet")
+search = st.sidebar.text_input(
+    "🔍 Search Tweet"
+)
 
 # =========================
-# FILTER LOGIC
+# FILTERS
 # =========================
 df_filtered = df.copy()
 
 if sentiment_filter != "All":
+
     df_filtered = df_filtered[
         df_filtered["AI_Sentiment"] == sentiment_filter
     ]
 
 if search:
 
-    search = search.lower()
-
     df_filtered = df_filtered[
-        df_filtered["Clean_Tweet"].str.contains(search, na=False, regex=False)
+        df_filtered["Clean_Tweet"].str.contains(
+            search.lower(),
+            na=False,
+            regex=False
+        )
     ]
 
 # =========================
@@ -123,15 +146,18 @@ sent_counts = df_filtered["AI_Sentiment"].value_counts()
 
 c1, c2, c3 = st.columns(3)
 
-c1.metric("📊 Tweets", df_filtered.shape[0])
+c1.metric(
+    "📊 Tweets",
+    len(df_filtered)
+)
 
 c2.metric(
-    "🟢 Positifs",
+    "🟢 Positive",
     sent_counts.get("Positive", 0)
 )
 
 c3.metric(
-    "🔴 Négatifs",
+    "🔴 Negative",
     sent_counts.get("Negative", 0)
 )
 
@@ -141,10 +167,10 @@ st.markdown("---")
 # TABS
 # =========================
 tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Analyse",
-    "☁️ WordCloud",
-    "📈 Graphiques",
-    "🔮 Test IA"
+    "📊 Data",
+    "☁️ Word Analysis",
+    "📈 Visualisation",
+    "🔮 Live Test"
 ])
 
 # =========================
@@ -152,11 +178,15 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # =========================
 with tab1:
 
-    st.subheader("Aperçu des données")
+    st.subheader("📁 Dataset Preview")
 
     st.dataframe(
         df_filtered[
-            ["OriginalTweet", "Clean_Tweet", "AI_Sentiment"]
+            [
+                "OriginalTweet",
+                "Clean_Tweet",
+                "AI_Sentiment"
+            ]
         ].head(20),
         use_container_width=True
     )
@@ -166,10 +196,25 @@ with tab1:
 # =========================
 with tab2:
 
-    st.subheader("Nuage de mots")
+    st.subheader("☁️ WordCloud Analysis")
+
+    option = st.selectbox(
+        "Select sentiment:",
+        ["All", "Positive", "Negative", "Neutral"]
+    )
+
+    if option != "All":
+
+        data_words = df_filtered[
+            df_filtered["AI_Sentiment"] == option
+        ]
+
+    else:
+
+        data_words = df_filtered
 
     text = " ".join(
-        df_filtered["Clean_Tweet"].astype(str)
+        data_words["Clean_Tweet"].astype(str)
     )
 
     wc = WordCloud(
@@ -187,68 +232,130 @@ with tab2:
 
     st.pyplot(fig)
 
+    # =====================
+    # TOP WORDS
+    # =====================
+    st.markdown("### 🔥 Top Words")
+
+    words = text.split()
+
+    common = Counter(words).most_common(15)
+
+    words_df = pd.DataFrame(
+        common,
+        columns=["Word", "Count"]
+    )
+
+    fig2 = px.bar(
+        words_df,
+        x="Word",
+        y="Count",
+        title="Most Frequent Words"
+    )
+
+    st.plotly_chart(
+        fig2,
+        use_container_width=True
+    )
+
 # =========================
 # TAB 3
 # =========================
 with tab3:
 
-    st.subheader("Distribution des sentiments")
+    st.subheader("📊 Sentiment Analytics")
 
-    fig1 = px.histogram(
+    fig1 = px.pie(
+        df_filtered,
+        names="AI_Sentiment",
+        title="Sentiment Distribution"
+    )
+
+    st.plotly_chart(
+        fig1,
+        use_container_width=True
+    )
+
+    fig2 = px.histogram(
         df_filtered,
         x="AI_Sentiment",
         color="AI_Sentiment",
-        title="Distribution des sentiments"
+        title="Sentiment Histogram"
     )
 
-    st.plotly_chart(fig1, use_container_width=True)
+    st.plotly_chart(
+        fig2,
+        use_container_width=True
+    )
 
-    fig2 = px.pie(
+    df_filtered["length"] = df_filtered[
+        "Clean_Tweet"
+    ].apply(len)
+
+    fig3 = px.box(
         df_filtered,
-        names="AI_Sentiment",
-        title="Répartition des sentiments"
+        x="AI_Sentiment",
+        y="length",
+        color="AI_Sentiment",
+        title="Tweet Length Analysis"
     )
 
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(
+        fig3,
+        use_container_width=True
+    )
 
 # =========================
 # TAB 4
 # =========================
 with tab4:
 
-    st.subheader("🔮 Analyse IA en temps réel")
-
-    user_text = st.text_area(
-        "✍️ Écris un tweet en anglais"
+    st.subheader(
+        "🔮 Live Sentiment Test (AI)"
     )
 
-    if st.button("Analyser"):
+    user_text = st.text_area(
+        "✍️ Enter text:"
+    )
+
+    if st.button("Analyze"):
 
         if user_text.strip() == "":
 
-            st.warning("Veuillez entrer un texte")
+            st.warning(
+                "Please enter text"
+            )
 
         else:
 
-            prediction = predict_sentiment(user_text)
+            prediction = predict_sentiment(
+                user_text
+            )
 
             if prediction == "Positive":
 
-                st.success("😊 POSITIF")
+                st.success(
+                    "😊 POSITIVE"
+                )
 
             elif prediction == "Negative":
 
-                st.error("😡 NEGATIF")
+                st.error(
+                    "😡 NEGATIVE"
+                )
 
             else:
 
-                st.info("😐 NEUTRE")
+                st.info(
+                    "😐 NEUTRAL"
+                )
 
 # =========================
 # FOOTER
 # =========================
 st.markdown("---")
 
-st.markdown(
-    "🚀 Projet Data Science | COVID-19 Sentiment Analysis | Streamlit + Machine Learning"
-)
+st.markdown("""
+🎓 UCD - FS El Jadida | IA S6 | Data Science  
+🦠 Sujet : ML for sentiment analysis: case of Covid 19
+""")
