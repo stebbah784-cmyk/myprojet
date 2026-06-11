@@ -13,36 +13,35 @@ from sklearn.metrics import (
     accuracy_score,
     classification_report,
     confusion_matrix,
-    ConfusionMatrixDisplay,
-    roc_curve,
-    auc
+    ConfusionMatrixDisplay
 )
 
 from sklearn.preprocessing import label_binarize
+from sklearn.metrics import roc_curve, auc
 
 # =========================
 # PAGE STYLE
 # =========================
 st.set_page_config(
-    page_title="UCD Sentiment AI",
+    page_title="UCD Sentiment AI Dashboard",
     page_icon="🎓",
     layout="wide"
 )
 
 st.markdown("""
-    <style>
-    .main {
-        background-color: #0f172a;
-        color: white;
-    }
-    h1 {
-        color: #38bdf8;
-        text-align: center;
-    }
-    </style>
+<style>
+.main {
+    background-color: #0f172a;
+    color: white;
+}
+h1 {
+    color: #38bdf8;
+    text-align: center;
+}
+</style>
 """, unsafe_allow_html=True)
 
-st.title("🎓 Sentiment Analysis Dashboard (UCD Project)")
+st.title("🎓 Sentiment Analysis Dashboard")
 
 # =========================
 # CLEAN TEXT
@@ -95,7 +94,7 @@ model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 
 # =========================
-# SIDEBAR FILTER
+# SIDEBAR
 # =========================
 st.sidebar.title("⚙️ Filters")
 
@@ -121,28 +120,41 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 # =========================
-# TAB 1
+# TAB 1 - DATA
 # =========================
 with tab1:
-    st.subheader("Dataset Preview")
+    st.subheader("📌 Dataset Preview")
     st.dataframe(df_view[["OriginalTweet", "Sentiment"]].head(20))
 
+    st.markdown("""
+### 📌 Definition:
+Dataset contains tweets about COVID-19 labeled as:
+- Positive 😊
+- Neutral 😐
+- Negative 😡
+""")
+
 # =========================
-# TAB 2
+# TAB 2 - VISUALIZATION
 # =========================
 with tab2:
-    st.subheader("Sentiment Distribution")
+    st.subheader("📊 Sentiment Distribution")
 
     fig = px.pie(df_view, names="Sentiment", hole=0.4)
     st.plotly_chart(fig, use_container_width=True)
 
+    st.markdown("""
+### 📌 Definition:
+This graph shows the proportion of each sentiment class in the dataset.
+""")
+
 # =========================
-# TAB 3
+# TAB 3 - LIVE PREDICTION
 # =========================
 with tab3:
-    st.subheader("Try Your Text")
+    st.subheader("💬 Test Your Text")
 
-    text = st.text_area("Write something...")
+    text = st.text_area("Write text here")
 
     if st.button("Predict"):
         cleaned = clean_text(text)
@@ -151,29 +163,55 @@ with tab3:
 
         st.success(f"Prediction: {pred}")
 
+    st.markdown("""
+### 📌 Definition:
+The model predicts sentiment of a custom text using TF-IDF + Logistic Regression.
+""")
+
 # =========================
-# TAB 4
+# TAB 4 - METRICS
 # =========================
 with tab4:
-    st.subheader("Model Performance")
+    st.subheader("📉 Model Evaluation")
 
     acc = accuracy_score(y_test, y_pred)
+
     st.metric("Accuracy", f"{acc:.2f}")
 
-    st.text(classification_report(y_test, y_pred))
+    # Classification Report Table
+    report = classification_report(y_test, y_pred, output_dict=True)
+    df_report = pd.DataFrame(report).transpose()
+
+    st.subheader("📋 Classification Report")
+    st.dataframe(df_report)
+
+    st.markdown("""
+### 📌 Definitions:
+
+- **Accuracy**: overall correct predictions
+- **Precision**: correctness of positive predictions  
+- **Recall**: ability to detect real positives  
+- **F1-score**: balance between precision and recall
+""")
+
+    # Confusion Matrix
+    st.subheader("📊 Confusion Matrix")
 
     cm = confusion_matrix(y_test, y_pred, labels=model.classes_)
+
     fig, ax = plt.subplots()
-    ConfusionMatrixDisplay(cm, display_labels=model.classes_).plot(ax=ax)
+    ConfusionMatrixDisplay(cm, display_labels=model.classes_).plot(ax=ax, cmap="Blues")
+
     st.pyplot(fig)
 
 # =========================
-# TAB 5
+# TAB 5 - ROC CURVE
 # =========================
 with tab5:
-    st.subheader("ROC Curve")
+    st.subheader("📡 ROC Curve")
 
     classes = model.classes_
+
     y_bin = label_binarize(y_test, classes=classes)
     y_score = model.predict_proba(X_test)
 
@@ -181,10 +219,18 @@ with tab5:
 
     for i in range(len(classes)):
         fpr, tpr, _ = roc_curve(y_bin[:, i], y_score[:, i])
-        plt.plot(fpr, tpr, label=classes[i])
+        roc_auc = auc(fpr, tpr)
+
+        plt.plot(fpr, tpr, label=f"{classes[i]} (AUC={roc_auc:.2f})")
 
     plt.plot([0, 1], [0, 1], "--")
     plt.legend()
     plt.title("ROC Curve")
 
     st.pyplot(plt)
+
+    st.markdown("""
+### 📌 Definition:
+ROC curve shows model ability to distinguish between classes.
+AUC closer to 1 = better model performance.
+""")
