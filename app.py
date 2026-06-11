@@ -7,7 +7,14 @@ import pickle
 import re
 from collections import Counter
 
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    ConfusionMatrixDisplay
+)
 
 # =========================
 # PAGE CONFIG
@@ -57,7 +64,7 @@ def clean_text(text):
     return text
 
 # =========================
-# PREDICTION
+# PREDICT
 # =========================
 def predict_sentiment(text):
     cleaned = clean_text(text)
@@ -171,11 +178,7 @@ with tab2:
 
     if text.strip() != "":
 
-        wc = WordCloud(
-            width=1200,
-            height=500,
-            background_color="white"
-        ).generate(text)
+        wc = WordCloud(width=1200, height=500, background_color="white").generate(text)
 
         fig, ax = plt.subplots()
         ax.imshow(wc, interpolation="bilinear")
@@ -202,7 +205,7 @@ with tab3:
     st.plotly_chart(fig2, use_container_width=True)
 
 # =========================
-# TAB 4 (LIVE TEST)
+# TAB 4
 # =========================
 with tab4:
 
@@ -223,9 +226,12 @@ with tab4:
                 st.info("😐 NEUTRAL")
 
 # =========================
-# TAB 5 (EVALUATION)
+# TAB 5 - EVALUATION
 # =========================
-def evaluate_model(df):
+with tab5:
+
+    st.subheader("📊 Model Evaluation Dashboard")
+
     y_true = df["Sentiment"]
     y_pred = df["AI_Sentiment"]
 
@@ -234,33 +240,38 @@ def evaluate_model(df):
     rec = recall_score(y_true, y_pred, average="weighted", zero_division=0)
     f1 = f1_score(y_true, y_pred, average="weighted", zero_division=0)
 
-    return acc, prec, rec, f1
+    metrics = pd.DataFrame({
+        "Metric": ["Accuracy", "Precision", "Recall", "F1 Score"],
+        "Score": [acc, prec, rec, f1]
+    })
 
-with tab5:
+    st.dataframe(metrics)
 
-    st.subheader("Model Evaluation Metrics")
+    # BAR
+    fig1 = px.bar(metrics, x="Metric", y="Score", text="Score", color="Metric")
+    fig1.update_layout(yaxis=dict(range=[0, 1]))
+    st.plotly_chart(fig1, use_container_width=True)
 
-    acc, prec, rec, f1 = evaluate_model(df)
+    # PIE
+    fig2 = px.pie(metrics, names="Metric", values="Score")
+    st.plotly_chart(fig2, use_container_width=True)
 
-    metrics = {
-        "Accuracy": acc,
-        "Precision": prec,
-        "Recall": rec,
-        "F1 Score": f1
-    }
+    # RADAR
+    fig3 = px.line_polar(metrics, r="Score", theta="Metric", line_close=True)
+    st.plotly_chart(fig3, use_container_width=True)
 
-    st.write(metrics)
+    # CONFUSION MATRIX
+    st.subheader("📉 Confusion Matrix")
 
-    fig = px.bar(
-        x=list(metrics.keys()),
-        y=list(metrics.values()),
-        text=[round(v, 2) for v in metrics.values()],
-        title="Model Performance"
-    )
+    labels = ["Positive", "Neutral", "Negative"]
 
-    fig.update_layout(yaxis=dict(range=[0, 1]))
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
 
-    st.plotly_chart(fig, use_container_width=True)
+    fig4, ax = plt.subplots()
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    disp.plot(ax=ax, cmap="Blues", values_format="d")
+
+    st.pyplot(fig4)
 
 # =========================
 # FOOTER
