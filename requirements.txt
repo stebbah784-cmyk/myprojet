@@ -2,9 +2,9 @@ streamlit
 pandas
 numpy
 matplotlib
-seaborn
-wordcloud
 plotly
-textblob
 scikit-learn
 scipy
+wordcloud
+textblob
+seaborn
