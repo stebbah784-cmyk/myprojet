@@ -7,6 +7,8 @@ import pickle
 import re
 from collections import Counter
 
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
 # =========================
 # PAGE CONFIG
 # =========================
@@ -43,25 +45,21 @@ model = pickle.load(open("model.pkl", "rb"))
 vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
 
 # =========================
-# CLEAN TEXT (MULTI-LANGUAGE SAFE)
+# CLEAN TEXT
 # =========================
 def clean_text(text):
     text = str(text).lower()
-
     text = re.sub(r"http\S+", "", text)
     text = re.sub(r"@\w+", "", text)
     text = re.sub(r"#", "", text)
-
-    # keep multilingual characters
     text = re.sub(r"[^\w\sÀ-ÿ]", "", text)
-
+    text = re.sub(r"\s+", " ", text).strip()
     return text
 
 # =========================
-# PREDICT SENTIMENT (FIXED)
+# PREDICTION
 # =========================
 def predict_sentiment(text):
-
     cleaned = clean_text(text)
 
     if cleaned.strip() == "":
@@ -70,7 +68,7 @@ def predict_sentiment(text):
     vector = vectorizer.transform([cleaned])
     prediction = model.predict(vector)[0]
 
-    return str(prediction)
+    return prediction
 
 # =========================
 # LOAD DATA
@@ -88,11 +86,9 @@ def load_data():
         "Extremely Negative": "Negative"
     }
 
-    if "Sentiment" in df.columns:
-        df["Sentiment"] = df["Sentiment"].map(mapping)
+    df["Sentiment"] = df["Sentiment"].map(mapping)
 
     df["Clean_Tweet"] = df["OriginalTweet"].apply(clean_text)
-
     df["AI_Sentiment"] = df["Clean_Tweet"].apply(predict_sentiment)
 
     return df
@@ -100,7 +96,7 @@ def load_data():
 df = load_data()
 
 # =========================
-# SIDEBAR
+# FILTERS
 # =========================
 st.sidebar.header("🔎 Filters")
 
@@ -111,14 +107,11 @@ sentiment_filter = st.sidebar.selectbox(
 
 search = st.sidebar.text_input("🔍 Search Tweet")
 
-# =========================
-# FILTERING
-# =========================
 df_filtered = df.copy()
 
 if sentiment_filter != "All":
     df_filtered = df_filtered[
-        df_filtered["AI_Sentiment"].str.lower().str.contains(sentiment_filter.lower())
+        df_filtered["AI_Sentiment"].str.lower() == sentiment_filter.lower()
     ]
 
 if search:
@@ -142,29 +135,25 @@ st.markdown("---")
 # =========================
 # TABS
 # =========================
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Data",
     "☁️ Word Analysis",
     "📈 Visualisation",
-    "🔮 Live Test"
+    "🔮 Live Test",
+    "📊 Evaluation"
 ])
 
 # =========================
 # TAB 1
 # =========================
 with tab1:
-    st.subheader("📁 Dataset Preview")
-    st.dataframe(
-        df_filtered[["OriginalTweet", "Clean_Tweet", "AI_Sentiment"]].head(20),
-        use_container_width=True
-    )
+    st.subheader("Dataset Preview")
+    st.dataframe(df_filtered[["OriginalTweet", "Clean_Tweet", "AI_Sentiment"]].head(20))
 
 # =========================
 # TAB 2
 # =========================
 with tab2:
-
-    st.subheader("☁️ WordCloud Analysis")
 
     option = st.selectbox(
         "Select sentiment:",
@@ -180,14 +169,12 @@ with tab2:
 
     text = " ".join(data_words["Clean_Tweet"].dropna().astype(str))
 
-    if text.strip() == "" or len(text.split()) < 2:
-        st.warning("⚠️ Not enough words to generate WordCloud.")
-    else:
+    if text.strip() != "":
+
         wc = WordCloud(
             width=1200,
             height=500,
-            background_color="white",
-            colormap="viridis"
+            background_color="white"
         ).generate(text)
 
         fig, ax = plt.subplots()
@@ -195,20 +182,12 @@ with tab2:
         ax.axis("off")
         st.pyplot(fig)
 
-        st.markdown("### 🔥 Top Words")
-
         words = text.split()
         common = Counter(words).most_common(15)
 
         words_df = pd.DataFrame(common, columns=["Word", "Count"])
 
-        fig2 = px.bar(
-            words_df,
-            x="Word",
-            y="Count",
-            title="Most Frequent Words"
-        )
-
+        fig2 = px.bar(words_df, x="Word", y="Count")
         st.plotly_chart(fig2, use_container_width=True)
 
 # =========================
@@ -216,59 +195,72 @@ with tab2:
 # =========================
 with tab3:
 
-    st.subheader("📊 Sentiment Analytics")
-
-    fig1 = px.pie(
-        df_filtered,
-        names="AI_Sentiment",
-        title="Sentiment Distribution"
-    )
+    fig1 = px.pie(df_filtered, names="AI_Sentiment")
     st.plotly_chart(fig1, use_container_width=True)
 
-    fig2 = px.histogram(
-        df_filtered,
-        x="AI_Sentiment",
-        color="AI_Sentiment",
-        title="Sentiment Histogram"
-    )
+    fig2 = px.histogram(df_filtered, x="AI_Sentiment", color="AI_Sentiment")
     st.plotly_chart(fig2, use_container_width=True)
 
-    df_filtered = df_filtered.copy()
-    df_filtered["length"] = df_filtered["Clean_Tweet"].apply(len)
-
-    fig3 = px.box(
-        df_filtered,
-        x="AI_Sentiment",
-        y="length",
-        color="AI_Sentiment",
-        title="Tweet Length Analysis"
-    )
-    st.plotly_chart(fig3, use_container_width=True)
-
 # =========================
-# TAB 4
+# TAB 4 (LIVE TEST)
 # =========================
 with tab4:
 
-    st.subheader("🔮 Live Sentiment Test (AI)")
-
-    user_text = st.text_area("✍️ Enter text:")
+    user_text = st.text_area("Enter text")
 
     if st.button("Analyze"):
 
         if user_text.strip() == "":
             st.warning("Please enter text")
         else:
+            pred = predict_sentiment(user_text)
 
-            prediction = predict_sentiment(user_text)
-            pred = prediction.lower()
-
-            if "positive" in pred:
+            if "positive" in pred.lower():
                 st.success("😊 POSITIVE")
-            elif "negative" in pred:
+            elif "negative" in pred.lower():
                 st.error("😡 NEGATIVE")
             else:
                 st.info("😐 NEUTRAL")
+
+# =========================
+# TAB 5 (EVALUATION)
+# =========================
+def evaluate_model(df):
+    y_true = df["Sentiment"]
+    y_pred = df["AI_Sentiment"]
+
+    acc = accuracy_score(y_true, y_pred)
+    prec = precision_score(y_true, y_pred, average="weighted", zero_division=0)
+    rec = recall_score(y_true, y_pred, average="weighted", zero_division=0)
+    f1 = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+
+    return acc, prec, rec, f1
+
+with tab5:
+
+    st.subheader("Model Evaluation Metrics")
+
+    acc, prec, rec, f1 = evaluate_model(df)
+
+    metrics = {
+        "Accuracy": acc,
+        "Precision": prec,
+        "Recall": rec,
+        "F1 Score": f1
+    }
+
+    st.write(metrics)
+
+    fig = px.bar(
+        x=list(metrics.keys()),
+        y=list(metrics.values()),
+        text=[round(v, 2) for v in metrics.values()],
+        title="Model Performance"
+    )
+
+    fig.update_layout(yaxis=dict(range=[0, 1]))
+
+    st.plotly_chart(fig, use_container_width=True)
 
 # =========================
 # FOOTER
