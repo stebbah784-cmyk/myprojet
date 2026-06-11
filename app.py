@@ -12,21 +12,27 @@ from sklearn.metrics import (
     accuracy_score,
     classification_report,
     confusion_matrix,
-    ConfusionMatrixDisplay,
-    roc_curve,
-    auc
+    ConfusionMatrixDisplay
 )
 
 from sklearn.preprocessing import label_binarize
+from sklearn.metrics import roc_curve, auc
 
 # =========================
-# PAGE CONFIG
+# PAGE CONFIG + STYLE
 # =========================
 st.set_page_config(
-    page_title="Sentiment AI Dashboard",
+    page_title="UCD Sentiment Dashboard",
     page_icon="🎓",
     layout="wide"
 )
+
+st.markdown("""
+<style>
+.main {background-color:#0f172a;color:white;}
+h1 {color:#38bdf8;text-align:center;}
+</style>
+""", unsafe_allow_html=True)
 
 st.title("🎓 Sentiment Analysis Dashboard")
 
@@ -81,17 +87,17 @@ model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 
 # =========================
-# SIDEBAR
+# SIDEBAR FILTER
 # =========================
 st.sidebar.title("⚙️ Filter")
-filter_sent = st.sidebar.selectbox(
+sent_filter = st.sidebar.selectbox(
     "Choose Sentiment",
     ["All", "Positive", "Neutral", "Negative"]
 )
 
 df_view = df.copy()
-if filter_sent != "All":
-    df_view = df_view[df_view["Sentiment"] == filter_sent]
+if sent_filter != "All":
+    df_view = df_view[df_view["Sentiment"] == sent_filter]
 
 # =========================
 # TABS
@@ -108,8 +114,14 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # TAB 1 - DATA
 # =========================
 with tab1:
-    st.subheader("Dataset")
+    st.subheader("Dataset Preview")
     st.dataframe(df_view[["OriginalTweet", "Sentiment"]].head(20))
+
+    st.markdown("""
+### 📌 Definition:
+Dataset contains COVID tweets labeled as:
+Positive, Neutral, Negative.
+""")
 
 # =========================
 # TAB 2 - VISUALIZATION
@@ -120,8 +132,13 @@ with tab2:
     fig = px.pie(df_view, names="Sentiment", hole=0.4)
     st.plotly_chart(fig, use_container_width=True)
 
+    st.markdown("""
+### 📌 Definition:
+Shows percentage of each sentiment class.
+""")
+
 # =========================
-# TAB 3 - LIVE PREDICTION
+# TAB 3 - LIVE TEST
 # =========================
 with tab3:
     st.subheader("Try Your Text")
@@ -134,8 +151,13 @@ with tab3:
         pred = model.predict(vector)[0]
         st.success(f"Prediction: {pred}")
 
+    st.markdown("""
+### 📌 Definition:
+Model predicts sentiment using TF-IDF + Logistic Regression.
+""")
+
 # =========================
-# TAB 4 - METRICS (CLEAN + GRAPHS)
+# TAB 4 - METRICS
 # =========================
 with tab4:
     st.subheader("Model Performance")
@@ -167,24 +189,32 @@ with tab4:
     st.subheader("Scores Table")
     st.dataframe(df_metrics)
 
-    # Precision
-    st.subheader("Precision")
-    st.plotly_chart(px.bar(df_metrics, x="Class", y="Precision", text="Precision"))
+    # 📊 Combined Graph
+    df_melt = df_metrics.melt(
+        id_vars="Class",
+        value_vars=["Precision", "Recall", "F1-score"],
+        var_name="Metric",
+        value_name="Score"
+    )
 
-    # Recall
-    st.subheader("Recall")
-    st.plotly_chart(px.bar(df_metrics, x="Class", y="Recall", text="Recall"))
+    fig = px.bar(df_melt, x="Class", y="Score", color="Metric", barmode="group")
+    st.plotly_chart(fig, use_container_width=True)
 
-    # F1
-    st.subheader("F1-score")
-    st.plotly_chart(px.bar(df_metrics, x="Class", y="F1-score", text="F1-score"))
+    st.markdown("""
+### 📌 Definitions:
+- Precision: correctness of predictions  
+- Recall: ability to detect real cases  
+- F1-score: balance between both  
+""")
 
     # Confusion Matrix
     st.subheader("Confusion Matrix")
 
     cm = confusion_matrix(y_test, y_pred, labels=model.classes_)
+
     fig, ax = plt.subplots()
     ConfusionMatrixDisplay(cm, display_labels=model.classes_).plot(ax=ax, cmap="Blues")
+
     st.pyplot(fig)
 
 # =========================
@@ -209,3 +239,9 @@ with tab5:
     plt.title("ROC Curve")
 
     st.pyplot(plt)
+
+    st.markdown("""
+### 📌 Definition:
+ROC curve measures model ability to distinguish classes.
+Closer to 1 = better model.
+""")
