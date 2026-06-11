@@ -29,8 +29,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🎓 UCD Sentiment Analysis Dashboard (ML Advanced)")
-st.markdown("🦠 Covid-19 Sentiment Analysis - Machine Learning Project")
+st.title("🎓 UCD Sentiment Analysis Dashboard")
+st.markdown("🦠 ML Project - Covid-19 Sentiment Analysis")
 
 st.markdown("---")
 
@@ -55,7 +55,6 @@ def clean_text(text):
 # PREDICT
 # =========================
 def predict_sentiment(text):
-
     cleaned = clean_text(text)
 
     if cleaned.strip() == "":
@@ -111,7 +110,7 @@ if sentiment_filter != "All":
 # =========================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Data",
-    "Visualisation",
+    "Visualization",
     "Live Test",
     "Evaluation",
     "Advanced ML"
@@ -127,7 +126,6 @@ with tab1:
 # TAB 2
 # =========================
 with tab2:
-
     fig = px.pie(df_filtered, names="AI_Sentiment")
     st.plotly_chart(fig, use_container_width=True)
 
@@ -135,17 +133,14 @@ with tab2:
 # TAB 3
 # =========================
 with tab3:
-
     text = st.text_area("Enter text")
 
     if st.button("Predict"):
-
         pred = predict_sentiment(text)
-
         st.write("Prediction:", pred)
 
 # =========================
-# TAB 4 - BASIC METRICS
+# TAB 4 - METRICS + CONFUSION MATRIX
 # =========================
 with tab4:
 
@@ -172,7 +167,7 @@ with tab4:
     # Confusion Matrix
     st.subheader("Confusion Matrix")
 
-    labels = ["Positive", "Neutral", "Negative"]
+    labels = model.classes_   # ✅ FIX IMPORTANT
 
     cm = confusion_matrix(y_true, y_pred, labels=labels)
 
@@ -182,18 +177,17 @@ with tab4:
     st.pyplot(fig2)
 
 # =========================
-# TAB 5 - ADVANCED ML
+# TAB 5 - ROC FIXED
 # =========================
 with tab5:
 
-    st.subheader("🔥 Advanced ML Analysis")
+    st.subheader("ROC Curve + AUC (FIXED)")
 
-    # ================= ROC =================
-    st.subheader("ROC Curve + AUC")
-
-    classes = ["Positive", "Neutral", "Negative"]
+    # ✅ IMPORTANT FIX: use model.classes_
+    classes = model.classes_
 
     y_true_bin = label_binarize(df["Sentiment"], classes=classes)
+
     y_score = model.predict_proba(vectorizer.transform(df["Clean_Tweet"]))
 
     fig = plt.figure()
@@ -206,11 +200,13 @@ with tab5:
 
     plt.plot([0, 1], [0, 1], "k--")
     plt.legend()
-    plt.title("ROC Curve")
+    plt.title("ROC Curve (Corrected)")
 
     st.pyplot(fig)
 
-    # ================= MISCLASSIFIED =================
+    # =========================
+    # MISCLASSIFIED
+    # =========================
     st.subheader("Misclassified Tweets")
 
     df_errors = df[df["Sentiment"] != df["AI_Sentiment"]]
@@ -218,16 +214,3 @@ with tab5:
     st.write("Errors:", len(df_errors))
 
     st.dataframe(df_errors[["OriginalTweet", "Sentiment", "AI_Sentiment"]].head(20))
-
-    fig2 = px.bar(
-        df_errors["Sentiment"].value_counts(),
-        title="Error Distribution"
-    )
-
-    st.plotly_chart(fig2, use_container_width=True)
-
-# =========================
-# FOOTER
-# =========================
-st.markdown("---")
-st.markdown("UCD - IA S6 | ML Sentiment Analysis Project")
