@@ -16,10 +16,10 @@ from sklearn.metrics import (
 )
 
 from sklearn.preprocessing import label_binarize
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve
 
 # =========================
-# PAGE CONFIG + STYLE
+# PAGE CONFIG
 # =========================
 st.set_page_config(
     page_title="UCD Sentiment Dashboard",
@@ -87,7 +87,7 @@ model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 
 # =========================
-# SIDEBAR FILTER
+# SIDEBAR
 # =========================
 st.sidebar.title("⚙️ Filter")
 sent_filter = st.sidebar.selectbox(
@@ -114,13 +114,17 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # TAB 1 - DATA
 # =========================
 with tab1:
-    st.subheader("Dataset Preview")
+    st.subheader("Dataset")
     st.dataframe(df_view[["OriginalTweet", "Sentiment"]].head(20))
 
     st.markdown("""
-### 📌 Definition:
-Dataset contains COVID tweets labeled as:
-Positive, Neutral, Negative.
+### 📌 Définition :
+Ce dataset contient des tweets liés au COVID-19.
+
+Les émotions sont classées en :
+- Positif  
+- Neutre  
+- Négatif  
 """)
 
 # =========================
@@ -133,34 +137,34 @@ with tab2:
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("""
-### 📌 Definition:
-Shows percentage of each sentiment class.
+### 📌 Définition :
+Ce graphique montre la répartition des sentiments dans le dataset.
 """)
 
 # =========================
 # TAB 3 - LIVE TEST
 # =========================
 with tab3:
-    st.subheader("Try Your Text")
+    st.subheader("Test du modèle")
 
-    text = st.text_area("Enter text")
+    text = st.text_area("Entrez un texte")
 
     if st.button("Predict"):
         cleaned = clean_text(text)
         vector = vectorizer.transform([cleaned])
         pred = model.predict(vector)[0]
-        st.success(f"Prediction: {pred}")
+        st.success(f"Résultat : {pred}")
 
     st.markdown("""
-### 📌 Definition:
-Model predicts sentiment using TF-IDF + Logistic Regression.
+### 📌 Définition :
+Le modèle prédit le sentiment d’un texte en utilisant TF-IDF + Logistic Regression.
 """)
 
 # =========================
 # TAB 4 - METRICS
 # =========================
 with tab4:
-    st.subheader("Model Performance")
+    st.subheader("Performance du modèle")
 
     acc = accuracy_score(y_test, y_pred)
     st.metric("Accuracy", f"{acc:.2f}")
@@ -168,7 +172,7 @@ with tab4:
     report = classification_report(y_test, y_pred, output_dict=True)
 
     df_metrics = pd.DataFrame({
-        "Class": ["Negative", "Neutral", "Positive"],
+        "Classe": ["Negative", "Neutral", "Positive"],
         "Precision": [
             report["Negative"]["precision"],
             report["Neutral"]["precision"],
@@ -186,29 +190,29 @@ with tab4:
         ]
     })
 
-    st.subheader("Scores Table")
+    st.subheader("Table des scores")
     st.dataframe(df_metrics)
 
-    # 📊 Combined Graph
     df_melt = df_metrics.melt(
-        id_vars="Class",
+        id_vars="Classe",
         value_vars=["Precision", "Recall", "F1-score"],
-        var_name="Metric",
+        var_name="Métrique",
         value_name="Score"
     )
 
-    fig = px.bar(df_melt, x="Class", y="Score", color="Metric", barmode="group")
+    fig = px.bar(df_melt, x="Classe", y="Score", color="Métrique", barmode="group")
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("""
-### 📌 Definitions:
-- Precision: correctness of predictions  
-- Recall: ability to detect real cases  
-- F1-score: balance between both  
+### 📌 Définitions :
+
+- **Précision** : qualité des prédictions positives  
+- **Rappel (Recall)** : capacité à détecter tous les vrais cas  
+- **F1-score** : équilibre entre précision et rappel  
+- **Accuracy** : taux global de bonnes prédictions  
 """)
 
-    # Confusion Matrix
-    st.subheader("Confusion Matrix")
+    st.subheader("Matrice de confusion")
 
     cm = confusion_matrix(y_test, y_pred, labels=model.classes_)
 
@@ -217,11 +221,16 @@ with tab4:
 
     st.pyplot(fig)
 
+    st.markdown("""
+### 📌 Définition :
+La matrice de confusion montre les bonnes et mauvaises prédictions.
+""")
+
 # =========================
 # TAB 5 - ROC
 # =========================
 with tab5:
-    st.subheader("ROC Curve")
+    st.subheader("Courbe ROC")
 
     classes = model.classes_
 
@@ -241,7 +250,7 @@ with tab5:
     st.pyplot(plt)
 
     st.markdown("""
-### 📌 Definition:
-ROC curve measures model ability to distinguish classes.
-Closer to 1 = better model.
+### 📌 Définition :
+La courbe ROC mesure la capacité du modèle à distinguer les classes.
+Plus elle est proche du coin supérieur gauche, meilleur est le modèle.
 """)
