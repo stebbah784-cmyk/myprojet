@@ -2,13 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.express as px
-import pickle
 import re
 import string
-
-from wordcloud import WordCloud
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -16,9 +12,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
-    precision_score,
-    recall_score,
-    f1_score,
     confusion_matrix,
     ConfusionMatrixDisplay,
     roc_curve,
@@ -28,10 +21,28 @@ from sklearn.metrics import (
 from sklearn.preprocessing import label_binarize
 
 # =========================
-# CONFIG
+# PAGE STYLE
 # =========================
-st.set_page_config(page_title="Sentiment App", layout="wide")
-st.title("🎓 Sentiment Analysis - Covid Tweets")
+st.set_page_config(
+    page_title="UCD Sentiment AI",
+    page_icon="🎓",
+    layout="wide"
+)
+
+st.markdown("""
+    <style>
+    .main {
+        background-color: #0f172a;
+        color: white;
+    }
+    h1 {
+        color: #38bdf8;
+        text-align: center;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("🎓 Sentiment Analysis Dashboard (UCD Project)")
 
 # =========================
 # CLEAN TEXT
@@ -68,7 +79,7 @@ def load_data():
 df = load_data()
 
 # =========================
-# TRAIN MODEL (once)
+# TRAIN MODEL
 # =========================
 vectorizer = TfidfVectorizer()
 X = vectorizer.fit_transform(df["Clean_Tweet"])
@@ -84,14 +95,17 @@ model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 
 # =========================
-# SIDEBAR
+# SIDEBAR FILTER
 # =========================
-st.sidebar.header("Filters")
-sentiment_filter = st.sidebar.selectbox("Sentiment", ["All", "Positive", "Neutral", "Negative"])
+st.sidebar.title("⚙️ Filters")
+
+sentiment_filter = st.sidebar.selectbox(
+    "Choose Sentiment",
+    ["All", "Positive", "Neutral", "Negative"]
+)
 
 df_view = df.copy()
 
-# (optional filter)
 if sentiment_filter != "All":
     df_view = df_view[df_view["Sentiment"] == sentiment_filter]
 
@@ -99,40 +113,54 @@ if sentiment_filter != "All":
 # TABS
 # =========================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "Data", "Visualization", "Live Test", "Metrics", "ROC"
+    "📊 Data",
+    "📈 Visualization",
+    "💬 Live Prediction",
+    "📉 Metrics",
+    "📡 ROC Curve"
 ])
 
 # =========================
 # TAB 1
 # =========================
 with tab1:
+    st.subheader("Dataset Preview")
     st.dataframe(df_view[["OriginalTweet", "Sentiment"]].head(20))
 
 # =========================
 # TAB 2
 # =========================
 with tab2:
-    fig = px.pie(df_view, names="Sentiment")
-    st.plotly_chart(fig)
+    st.subheader("Sentiment Distribution")
+
+    fig = px.pie(df_view, names="Sentiment", hole=0.4)
+    st.plotly_chart(fig, use_container_width=True)
 
 # =========================
 # TAB 3
 # =========================
 with tab3:
-    text = st.text_area("Enter text")
+    st.subheader("Try Your Text")
+
+    text = st.text_area("Write something...")
 
     if st.button("Predict"):
         cleaned = clean_text(text)
         vector = vectorizer.transform([cleaned])
         pred = model.predict(vector)[0]
-        st.success(pred)
+
+        st.success(f"Prediction: {pred}")
 
 # =========================
-# TAB 4 METRICS
+# TAB 4
 # =========================
 with tab4:
-    st.write("Accuracy:", accuracy_score(y_test, y_pred))
-    st.write(classification_report(y_test, y_pred))
+    st.subheader("Model Performance")
+
+    acc = accuracy_score(y_test, y_pred)
+    st.metric("Accuracy", f"{acc:.2f}")
+
+    st.text(classification_report(y_test, y_pred))
 
     cm = confusion_matrix(y_test, y_pred, labels=model.classes_)
     fig, ax = plt.subplots()
@@ -140,12 +168,13 @@ with tab4:
     st.pyplot(fig)
 
 # =========================
-# TAB 5 ROC
+# TAB 5
 # =========================
 with tab5:
+    st.subheader("ROC Curve")
+
     classes = model.classes_
     y_bin = label_binarize(y_test, classes=classes)
-
     y_score = model.predict_proba(X_test)
 
     plt.figure()
@@ -154,6 +183,8 @@ with tab5:
         fpr, tpr, _ = roc_curve(y_bin[:, i], y_score[:, i])
         plt.plot(fpr, tpr, label=classes[i])
 
+    plt.plot([0, 1], [0, 1], "--")
     plt.legend()
     plt.title("ROC Curve")
+
     st.pyplot(plt)
