@@ -4,7 +4,3 @@ numpy
 matplotlib
 plotly
 scikit-learn
-scipy
-wordcloud
-textblob
-seaborn
