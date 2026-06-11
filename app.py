@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
 import re
@@ -13,33 +12,21 @@ from sklearn.metrics import (
     accuracy_score,
     classification_report,
     confusion_matrix,
-    ConfusionMatrixDisplay
+    ConfusionMatrixDisplay,
+    roc_curve,
+    auc
 )
 
 from sklearn.preprocessing import label_binarize
-from sklearn.metrics import roc_curve, auc
 
 # =========================
-# PAGE STYLE
+# PAGE CONFIG
 # =========================
 st.set_page_config(
-    page_title="UCD Sentiment AI Dashboard",
+    page_title="Sentiment AI Dashboard",
     page_icon="🎓",
     layout="wide"
 )
-
-st.markdown("""
-<style>
-.main {
-    background-color: #0f172a;
-    color: white;
-}
-h1 {
-    color: #38bdf8;
-    text-align: center;
-}
-</style>
-""", unsafe_allow_html=True)
 
 st.title("🎓 Sentiment Analysis Dashboard")
 
@@ -96,17 +83,15 @@ y_pred = model.predict(X_test)
 # =========================
 # SIDEBAR
 # =========================
-st.sidebar.title("⚙️ Filters")
-
-sentiment_filter = st.sidebar.selectbox(
+st.sidebar.title("⚙️ Filter")
+filter_sent = st.sidebar.selectbox(
     "Choose Sentiment",
     ["All", "Positive", "Neutral", "Negative"]
 )
 
 df_view = df.copy()
-
-if sentiment_filter != "All":
-    df_view = df_view[df_view["Sentiment"] == sentiment_filter]
+if filter_sent != "All":
+    df_view = df_view[df_view["Sentiment"] == filter_sent]
 
 # =========================
 # TABS
@@ -114,101 +99,99 @@ if sentiment_filter != "All":
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Data",
     "📈 Visualization",
-    "💬 Live Prediction",
+    "💬 Live Test",
     "📉 Metrics",
-    "📡 ROC Curve"
+    "📡 ROC"
 ])
 
 # =========================
 # TAB 1 - DATA
 # =========================
 with tab1:
-    st.subheader("📌 Dataset Preview")
+    st.subheader("Dataset")
     st.dataframe(df_view[["OriginalTweet", "Sentiment"]].head(20))
-
-    st.markdown("""
-### 📌 Definition:
-Dataset contains tweets about COVID-19 labeled as:
-- Positive 😊
-- Neutral 😐
-- Negative 😡
-""")
 
 # =========================
 # TAB 2 - VISUALIZATION
 # =========================
 with tab2:
-    st.subheader("📊 Sentiment Distribution")
+    st.subheader("Sentiment Distribution")
 
     fig = px.pie(df_view, names="Sentiment", hole=0.4)
     st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("""
-### 📌 Definition:
-This graph shows the proportion of each sentiment class in the dataset.
-""")
 
 # =========================
 # TAB 3 - LIVE PREDICTION
 # =========================
 with tab3:
-    st.subheader("💬 Test Your Text")
+    st.subheader("Try Your Text")
 
-    text = st.text_area("Write text here")
+    text = st.text_area("Enter text")
 
     if st.button("Predict"):
         cleaned = clean_text(text)
         vector = vectorizer.transform([cleaned])
         pred = model.predict(vector)[0]
-
         st.success(f"Prediction: {pred}")
 
-    st.markdown("""
-### 📌 Definition:
-The model predicts sentiment of a custom text using TF-IDF + Logistic Regression.
-""")
-
 # =========================
-# TAB 4 - METRICS
+# TAB 4 - METRICS (CLEAN + GRAPHS)
 # =========================
 with tab4:
-    st.subheader("📉 Model Evaluation")
+    st.subheader("Model Performance")
 
     acc = accuracy_score(y_test, y_pred)
-
     st.metric("Accuracy", f"{acc:.2f}")
 
-    # Classification Report Table
     report = classification_report(y_test, y_pred, output_dict=True)
-    df_report = pd.DataFrame(report).transpose()
 
-    st.subheader("📋 Classification Report")
-    st.dataframe(df_report)
+    df_metrics = pd.DataFrame({
+        "Class": ["Negative", "Neutral", "Positive"],
+        "Precision": [
+            report["Negative"]["precision"],
+            report["Neutral"]["precision"],
+            report["Positive"]["precision"]
+        ],
+        "Recall": [
+            report["Negative"]["recall"],
+            report["Neutral"]["recall"],
+            report["Positive"]["recall"]
+        ],
+        "F1-score": [
+            report["Negative"]["f1-score"],
+            report["Neutral"]["f1-score"],
+            report["Positive"]["f1-score"]
+        ]
+    })
 
-    st.markdown("""
-### 📌 Definitions:
+    st.subheader("Scores Table")
+    st.dataframe(df_metrics)
 
-- **Accuracy**: overall correct predictions
-- **Precision**: correctness of positive predictions  
-- **Recall**: ability to detect real positives  
-- **F1-score**: balance between precision and recall
-""")
+    # Precision
+    st.subheader("Precision")
+    st.plotly_chart(px.bar(df_metrics, x="Class", y="Precision", text="Precision"))
+
+    # Recall
+    st.subheader("Recall")
+    st.plotly_chart(px.bar(df_metrics, x="Class", y="Recall", text="Recall"))
+
+    # F1
+    st.subheader("F1-score")
+    st.plotly_chart(px.bar(df_metrics, x="Class", y="F1-score", text="F1-score"))
 
     # Confusion Matrix
-    st.subheader("📊 Confusion Matrix")
+    st.subheader("Confusion Matrix")
 
     cm = confusion_matrix(y_test, y_pred, labels=model.classes_)
-
     fig, ax = plt.subplots()
     ConfusionMatrixDisplay(cm, display_labels=model.classes_).plot(ax=ax, cmap="Blues")
-
     st.pyplot(fig)
 
 # =========================
-# TAB 5 - ROC CURVE
+# TAB 5 - ROC
 # =========================
 with tab5:
-    st.subheader("📡 ROC Curve")
+    st.subheader("ROC Curve")
 
     classes = model.classes_
 
@@ -219,18 +202,10 @@ with tab5:
 
     for i in range(len(classes)):
         fpr, tpr, _ = roc_curve(y_bin[:, i], y_score[:, i])
-        roc_auc = auc(fpr, tpr)
-
-        plt.plot(fpr, tpr, label=f"{classes[i]} (AUC={roc_auc:.2f})")
+        plt.plot(fpr, tpr, label=classes[i])
 
     plt.plot([0, 1], [0, 1], "--")
     plt.legend()
     plt.title("ROC Curve")
 
     st.pyplot(plt)
-
-    st.markdown("""
-### 📌 Definition:
-ROC curve shows model ability to distinguish between classes.
-AUC closer to 1 = better model performance.
-""")
