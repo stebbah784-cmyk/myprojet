@@ -8,24 +8,16 @@ from wordcloud import WordCloud
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score, classification_report
 
 # =========================
-# LOAD DATASET
+# LOAD DATA
 # =========================
 df = pd.read_csv("Corona_NLP_train.csv")
 
-print(df.head())
-print(df.info())
-
 # =========================
-# CHECK MISSING VALUES
-# =========================
-print(df.isnull().sum())
-
-# =========================
-# MERGE 5 CLASSES INTO 3
+# MERGE TO 3 CLASSES
 # =========================
 mapping = {
     "Extremely Positive": "Positive",
@@ -62,19 +54,17 @@ plt.axis("off")
 plt.show()
 
 # =========================
-# TEXT CLEANING
+# CLEANING
 # =========================
 def clean_text(text):
 
     text = str(text).lower()
 
     text = re.sub(r"http\S+", "", text)
-
     text = re.sub(r"@\w+", "", text)
-
     text = re.sub(r"#", "", text)
 
-    text = re.sub(r"[^a-zA-Z\s]", "", text)
+    text = re.sub(r"[^a-zA-Z\s]", " ", text)
 
     text = re.sub(r"\s+", " ", text).strip()
 
@@ -83,24 +73,21 @@ def clean_text(text):
 df["Clean_Tweet"] = df["OriginalTweet"].apply(clean_text)
 
 # =========================
-# FEATURES & TARGET
+# FEATURES
 # =========================
 X_text = df["Clean_Tweet"]
-
 y = df["Sentiment"]
 
-# =========================
-# TF-IDF
-# =========================
 vectorizer = TfidfVectorizer(
     stop_words="english",
-    max_features=10000
+    max_features=15000,
+    ngram_range=(1, 2)
 )
 
 X = vectorizer.fit_transform(X_text)
 
 # =========================
-# TRAIN TEST SPLIT
+# SPLIT
 # =========================
 X_train, X_test, y_train, y_test = train_test_split(
     X,
@@ -113,9 +100,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 # =========================
 # MODEL
 # =========================
-model = LogisticRegression(
-    max_iter=1000
-)
+model = LinearSVC()
 
 model.fit(X_train, y_train)
 
@@ -124,40 +109,45 @@ model.fit(X_train, y_train)
 # =========================
 y_pred = model.predict(X_test)
 
-accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy =", accuracy_score(y_test, y_pred))
 
-print("\nAccuracy =", accuracy)
-
-print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred))
 
-print("\nClasses learned by model:")
+print("Classes:")
 print(model.classes_)
 
 # =========================
-# QUICK TEST
+# TESTS
 # =========================
-samples = [
+tests = [
     "very nice",
-    "excellent work",
-    "i love this",
+    "excellent",
+    "amazing",
+    "i love it",
+    "good job",
+    "bad",
     "terrible",
-    "very bad",
-    "awful"
+    "awful",
+    "i hate it",
+    "dislike",
+    "normal day",
+    "nothing special"
 ]
 
-print("\nQuick Test:\n")
+print("\n===== TESTS =====")
 
-for s in samples:
-    x = vectorizer.transform([clean_text(s)])
-    pred = model.predict(x)[0]
-    print(f"{s} ---> {pred}")
+for t in tests:
+    pred = model.predict(
+        vectorizer.transform([clean_text(t)])
+    )[0]
+
+    print(f"{t} --> {pred}")
 
 # =========================
-# SAVE MODEL
+# SAVE
 # =========================
 pickle.dump(model, open("model.pkl", "wb"))
 pickle.dump(vectorizer, open("vectorizer.pkl", "wb"))
 
-print("\n✅ model.pkl saved")
+print("✅ model.pkl saved")
 print("✅ vectorizer.pkl saved")
