@@ -1,23 +1,31 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import re
+import string
 import pickle
 
 from wordcloud import WordCloud
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.svm import LinearSVC
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 
 # =========================
 # LOAD DATA
 # =========================
-df = pd.read_csv("Corona_NLP_train.csv")
+df = pd.read_csv("Corona_NLP_test.csv", encoding="latin-1")
+
+print(df.head())
+
+print(df.info())
+
+print(df.isnull().sum())
 
 # =========================
-# MERGE TO 3 CLASSES
+# SENTIMENT MAPPING
 # =========================
 mapping = {
     "Extremely Positive": "Positive",
@@ -32,122 +40,108 @@ df["Sentiment"] = df["Sentiment"].map(mapping)
 # =========================
 # VISUALIZATION
 # =========================
-plt.figure(figsize=(8, 5))
-sns.countplot(x="Sentiment", data=df)
+sns.countplot(x='Sentiment', data=df)
+
 plt.title("Sentiment Distribution")
+
+plt.xticks(rotation=45)
+
 plt.show()
 
 # =========================
 # WORD CLOUD
 # =========================
-text = " ".join(df["OriginalTweet"].astype(str))
+text = " ".join(df['OriginalTweet'].astype(str))
 
 wordcloud = WordCloud(
     width=1000,
     height=500,
-    background_color="white"
+    background_color='white'
 ).generate(text)
 
-plt.figure(figsize=(12, 6))
+plt.figure(figsize=(12,6))
+
 plt.imshow(wordcloud)
+
 plt.axis("off")
+
+plt.title("Word Cloud")
+
 plt.show()
 
 # =========================
-# CLEANING
+# CLEAN TEXT
 # =========================
 def clean_text(text):
 
     text = str(text).lower()
 
     text = re.sub(r"http\S+", "", text)
+
     text = re.sub(r"@\w+", "", text)
+
     text = re.sub(r"#", "", text)
 
-    text = re.sub(r"[^a-zA-Z\s]", " ", text)
+    text = re.sub(
+        r"[%s]" % re.escape(string.punctuation),
+        "",
+        text
+    )
 
-    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[^a-zA-Z\s]", "", text)
 
     return text
 
-df["Clean_Tweet"] = df["OriginalTweet"].apply(clean_text)
+# =========================
+# APPLY CLEANING
+# =========================
+df['Clean_Tweet'] = df['OriginalTweet'].apply(clean_text)
 
 # =========================
 # FEATURES
 # =========================
-X_text = df["Clean_Tweet"]
-y = df["Sentiment"]
+vectorizer = TfidfVectorizer()
 
-vectorizer = TfidfVectorizer(
-    stop_words="english",
-    max_features=15000,
-    ngram_range=(1, 2)
-)
+X = vectorizer.fit_transform(df['Clean_Tweet'])
 
-X = vectorizer.fit_transform(X_text)
+y = df['Sentiment']
 
 # =========================
-# SPLIT
+# SPLIT DATA
 # =========================
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
     test_size=0.2,
-    random_state=42,
-    stratify=y
+    random_state=42
 )
 
 # =========================
 # MODEL
 # =========================
-model = LinearSVC()
+model = LogisticRegression(max_iter=1000)
 
 model.fit(X_train, y_train)
 
 # =========================
-# EVALUATION
+# PREDICTION
 # =========================
 y_pred = model.predict(X_test)
 
-print("Accuracy =", accuracy_score(y_test, y_pred))
+# =========================
+# EVALUATION
+# =========================
+accuracy = accuracy_score(y_test, y_pred)
+
+print("Accuracy:", accuracy)
 
 print(classification_report(y_test, y_pred))
 
-print("Classes:")
-print(model.classes_)
-
 # =========================
-# TESTS
-# =========================
-tests = [
-    "very nice",
-    "excellent",
-    "amazing",
-    "i love it",
-    "good job",
-    "bad",
-    "terrible",
-    "awful",
-    "i hate it",
-    "dislike",
-    "normal day",
-    "nothing special"
-]
-
-print("\n===== TESTS =====")
-
-for t in tests:
-    pred = model.predict(
-        vectorizer.transform([clean_text(t)])
-    )[0]
-
-    print(f"{t} --> {pred}")
-
-# =========================
-# SAVE
+# SAVE MODEL
 # =========================
 pickle.dump(model, open("model.pkl", "wb"))
+
 pickle.dump(vectorizer, open("vectorizer.pkl", "wb"))
 
-print("✅ model.pkl saved")
-print("✅ vectorizer.pkl saved")
+print("✅ Model & Vectorizer saved!")
