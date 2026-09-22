@@ -56,7 +56,7 @@ h1 {
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("### Réalisée par : Wakil Chaimae , Stebba Houda")
+st.markdown("### Réalisée par :  Stebba Houda")
 
 # =========================
 # CLEAN TEXT
